@@ -8,7 +8,7 @@ class ByBitAPI:
     TIMEZONE = "UTC"
     LIVE_ENDPOINT = "https://api.bybit.com"
     TESTNET_ENDPOINT = "https://api-testnet.bybit.com"
- 
+
     def __init__(self,credentials):
         self.API_KEY = credentials['api_key']
         self.API_SECRET = credentials['api_secret']
@@ -34,7 +34,7 @@ class ByBitAPI:
         return df
 
 
-    def place_order(self, symbol:str, side:str, quantity:float, orderType:str="MARKET",limitPrice:float=None):
+    def place_order(self, symbol:str, side:str, quantity:float, stoploss:float=None , targetprofit:float =None ,orderType:str="MARKET",limitPrice:float=None):
 		
         params = {
 			"symbol":symbol,
@@ -44,27 +44,9 @@ class ByBitAPI:
 			"time_in_force":"GoodTillCancel",
 			"close_on_trigger":False,
 			"reduce_only":False,
-		}
+            "stop_loss":stoploss,
+            "take_profit":targetprofit  
+        }
         order = self.client.place_active_order(**params)
         print(order)
-
-        
-if __name__ == "__main__":
-    creds = {
-		"api_key":"LvUwGxYmzJ3AztscpZ",
-		"api_secret":"l2oPwTAC5adMuuwmPBHEC6zZdgl3TlIk9uR9",
-		"testnet":True
-	}
-    api = ByBitAPI(credentials=creds)
-    api.connect()
-
-    symbol = "BTCUSDT"
-    timeframe = "5m"
-    df = api.get_candle_data(symbol=symbol,timeframe=timeframe)
-    # print(df)
-
-    symbol = "BTCUSDT"
-    side = "buy"
-    quantity = 0.001
-    api.place_order(symbol=symbol, side=side, quantity=quantity)
 

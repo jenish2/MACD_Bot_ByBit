@@ -50,15 +50,15 @@ class Bot(Thread):
     def exit_conditions(self, df, position: dict = None):
         if position['side'] == 'buy':
             if df.low.iat[-1] <= position['stoploss']:
-                return True, 'stoploss'
+                return True, 'stoploss' , True
             elif df.high.iat[-1] >= position['targetprofit']:
-                return True, 'targetprofit'
+                return True, 'targetprofit', True
         elif position['side'] == 'sell':
             if df.high.iat[-1] >= position['stoploss']:
-                return True, 'stoploss'
+                return True, 'stoploss' , False
 
             elif df.low.iat[-1] <= position['targetprofit']:
-                return True, 'targetprofit'
+                return True, 'targetprofit' , False
 
         return False, ''
 
@@ -87,17 +87,46 @@ class Bot(Thread):
                                         stoploss = min(df.high[-12:])
                                         targetprofit = currentClose + (currentClose - stoploss) * float(
                                             self.CONFIG['risk_reward_ratio'].split(':')[1])
+                                    
                                     if entrySide == "Sell":
-                                        stoploss = min(df.high[-12:])
+                                        stoploss = max(df.high[-12:])
                                         targetprofit = currentClose - (currentClose - stoploss) * float(
                                             self.CONFIG['risk_reward_ratio'].split(':')[1])
 
-                            else:
-                                canExit, exitType = self.exit_conditions(df)
-                                if canExit:
-                                    del self._position[symbol]
+                                    if get_percentage(currentClose, stoploss, entrySide) <= 0.35:
+                                        signal = {
+                                            'symbol': symbol,
+                                            'side': entrySide,
+                                            'quantity': quantity,
+                                            'stoploss': stoploss,
+                                            'take_profit': targetprofit
+                                        }
+                                        print(signal)
+                                        if entrySide == "Buy":
+                                            self.API.place_order(symbol=symbol,side='BUY',quantity=quantity,stoploss=stoploss,targetprofit=targetprofit,type='MARKET')
+                                            print(f'OPEN {entrySide}')
+                                            self._positions[symbol] = signal.copy()
+                                        if entrySide == "Sell":
+                                            self.API.place_order(symbol=symbol,side='SELL',quantity=quantity,stoploss=stoploss,targetprofit=targetprofit,type='MARKET')
+                                            print(f'OPEN {entrySide}')
+                                            self._positions[symbol] = signal.copy()
+
+                                else:
+                                    canExit, exitType , positionType = self.exit_conditions(df,self._positions['symbol'])
+                                    if canExit:
+                                        if positionType:
+                                            self.API.place_order(symbol=self._positions['symbol'],side='SELL',quantity=self._positions['quantity'],type='MARKET')
+                                            print('Sell')
+                                            print(exitType)
+                                            del self._position[symbol]
+                                        else:
+                                            self.API.place_order(symbol=self._positions['symbol'],side='BUY',quantity=self._positions['quantity'],type='MARKET')
+                                            print('Buy')
+                                            print(exitType)
+                                            del self._position[symbol]
 
                         except Exception as e:
                             print(e)
             except Exception as e:
                 print(e)
+                continue

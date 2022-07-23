@@ -99,8 +99,8 @@ class Bot(Thread):
                                         stop_loss = min(df.high[-12:])
                                         print("StopLoss Buy Side:- " + str(stop_loss))
                                         print("Current Close"+str(currentClose))
-                                        take_profit = currentClose + (currentClose - stop_loss) * float(
-                                            self.CONFIG['risk_reward_ratio'].split(':')[1])
+                                        take_profit = currentClose + abs((currentClose - stop_loss) * float(
+                                            self.CONFIG['risk_reward_ratio'].split(':')[1]))
 
                                         print("TargetProfit BuySide:- " + str(take_profit))
 

@@ -34,7 +34,7 @@ class ByBitAPI:
         df.index = [datetime.fromtimestamp(x, tz=pytz.timezone(self.TIMEZONE)) for x in df.index]
         df = df[['open', 'high', 'low', 'close', 'volume']]
         print("data fetched by api")
-        print(df)
+        # print(data)
         return df
 
     def place_order(self, symbol: str, side: str, quantity: float, stop_loss: float = None, take_profit: float = None,

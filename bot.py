@@ -37,29 +37,47 @@ class Bot(Thread):
             signalperiod=self.CONFIG['macd_signal_period']
         )
 
-        print(ema.iat[-1])
-        print(macd.iat[-1])
-        print(macdSignal.iat[-1])
+        if self.CONFIG['use_2nd_ema']:
+            ema2 = ta.func.EMA(df.close, self.CONFIG['ema_period_2'])
+            # Checking for LONG ENTRY
+            if currentPrice >= ema2.iat[-1] > ema.iat[-1]:
+                print("Checking in uptrend + using 2 ema")
+                if all([
+                    (macd.iat[-1] > macdSignal.iat[-1]) and (macd.iat[-2] < macdSignal.iat[-2]),  # MACD Crossabove
+                    macdHist.iat[-1] > 0,  # Histogram is Green,
+                    macd.iat[-1] < 0,  # MACD is below zero line
+                ]):
+                    return 'Buy'
 
-        # Checking for LONG ENTRY
-        if currentPrice > ema.iat[-1]:
-            print("Checking in uptrend")
-            if all([
-                (macd.iat[-1] > macdSignal.iat[-1]) and (macd.iat[-2] < macdSignal.iat[-2]),  # MACD Crossabove
-                macdHist.iat[-1] > 0,  # Histogram is Green,
-                macd.iat[-1] < 0,  # MACD is below zero line
-            ]):
-                return 'Buy'
+            # Checking for LONG ENTRY
+            elif currentPrice <= ema2.iat[-1] < ema.iat[-1]:
+                print("Checking in downtrend + using 2 ema")
+                if all([
+                    (macd.iat[-1] < macdSignal.iat[-1]) and (macd.iat[-2] > macdSignal.iat[-2]),  # MACD Crossbelow
+                    macdHist.iat[-1] < 0,  # Histogram is Red,
+                    macd.iat[-1] > 0,  # MACD is above zero line
+                ]):
+                    return 'Sell'
+        else:
+            # Checking for LONG ENTRY
+            if currentPrice > ema.iat[-1]:
+                print("Checking in uptrend")
+                if all([
+                    (macd.iat[-1] > macdSignal.iat[-1]) and (macd.iat[-2] < macdSignal.iat[-2]),  # MACD Crossabove
+                    macdHist.iat[-1] > 0,  # Histogram is Green,
+                    macd.iat[-1] < 0,  # MACD is below zero line
+                ]):
+                    return 'Buy'
 
-        # Checking for LONG ENTRY
-        elif currentPrice < ema.iat[-1]:
-            print("Checking in downtrend")
-            if all([
-                (macd.iat[-1] < macdSignal.iat[-1]) and (macd.iat[-2] > macdSignal.iat[-2]),  # MACD Crossbelow
-                macdHist.iat[-1] < 0,  # Histogram is Red,
-                macd.iat[-1] > 0,  # MACD is above zero line
-            ]):
-                return 'Sell'
+            # Checking for LONG ENTRY
+            elif currentPrice < ema.iat[-1]:
+                print("Checking in downtrend")
+                if all([
+                    (macd.iat[-1] < macdSignal.iat[-1]) and (macd.iat[-2] > macdSignal.iat[-2]),  # MACD Crossbelow
+                    macdHist.iat[-1] < 0,  # Histogram is Red,
+                    macd.iat[-1] > 0,  # MACD is above zero line
+                ]):
+                    return 'Sell'
 
         return ''
 

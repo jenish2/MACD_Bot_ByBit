@@ -29,12 +29,17 @@ class Bot(Thread):
     def entry_conditions(self, df: pd.DataFrame):
         currentPrice = df.close.iat[-1]
         ema = ta.func.EMA(df.close, self.CONFIG['ema_period'])
+
         macd, macdSignal, macdHist = ta.func.MACD(
             df.close,
             fastperiod=self.CONFIG['macd_fast_period'],
             slowperiod=self.CONFIG['macd_slow_period'],
             signalperiod=self.CONFIG['macd_signal_period']
         )
+
+        print(ema.iat[-1])
+        print(macd.iat[-1])
+        print(macdSignal.iat[-1])
 
         # Checking for LONG ENTRY
         if currentPrice > ema.iat[-1]:
@@ -89,6 +94,7 @@ class Bot(Thread):
                             df = self.API.get_candle_data(symbol=symbol, timeframe=timeframe)
 
                             if symbol not in self._position:
+                                # self.API.set_leverage(symbol=symbol, buy_leverage=self.CONFIG['leverage'],sell_leverage=self.CONFIG['leverage'])
                                 print(f"Checking entry for {symbol}")
                                 entrySide = self.entry_conditions(df)
                                 print(entrySide)

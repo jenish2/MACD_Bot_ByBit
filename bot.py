@@ -1,5 +1,8 @@
+# Author : Jenish Dholariya
+
 import time
 from datetime import datetime
+from datetime import timezone
 from threading import Thread
 
 import pandas as pd
@@ -26,11 +29,11 @@ class Bot(Thread):
         if timeframe[-1] == 'm':
             return (cT.second == 0) and (cT.minute % int(timeframe[:-1])) == 0
 
-    def entry_conditions(self, df: pd.DataFrame):
-        currentPrice = df.close.iat[-1]
-        ema = ta.func.EMA(df.close, self.CONFIG['ema_period'])
+    def entry_conditions(self, df: pd.DataFrame, symbol: str, timeframe: str):
+        current_price = df.close.iat[-1]
 
-        macd, macdSignal, macdHist = ta.func.MACD(
+        ema = self.API.get_ema_long_time(symbol=symbol, timeframe=timeframe, ema_period=self.CONFIG['ema_period'])
+        macd, macd_signal, macd_hist = ta.func.MACD(
             df.close,
             fastperiod=self.CONFIG['macd_fast_period'],
             slowperiod=self.CONFIG['macd_slow_period'],
@@ -40,66 +43,69 @@ class Bot(Thread):
         if self.CONFIG['use_2nd_ema']:
             ema2 = ta.func.EMA(df.close, self.CONFIG['ema_period_2'])
             # Checking for LONG ENTRY
-            if currentPrice >= ema2.iat[-1] > ema.iat[-1]:
+            if current_price > ema2.iat[-1] and current_price > ema:
                 print("Checking in uptrend + using 2 ema")
                 if all([
-                    (macd.iat[-1] > macdSignal.iat[-1]) and (macd.iat[-2] < macdSignal.iat[-2]),  # MACD Crossabove
-                    macdHist.iat[-1] > 0,  # Histogram is Green,
+                    (macd.iat[-1] > macd_signal.iat[-1]) and (macd.iat[-2] < macd_signal.iat[-2]),  # MACD Crossabove
+                    macd_hist.iat[-1] > 0,  # Histogram is Green,
                     macd.iat[-1] < 0,  # MACD is below zero line
                 ]):
                     return 'Buy'
 
             # Checking for LONG ENTRY
-            elif currentPrice <= ema2.iat[-1] < ema.iat[-1]:
+            elif current_price < ema2.iat[-1] and current_price < ema:
                 print("Checking in downtrend + using 2 ema")
                 if all([
-                    (macd.iat[-1] < macdSignal.iat[-1]) and (macd.iat[-2] > macdSignal.iat[-2]),  # MACD Crossbelow
-                    macdHist.iat[-1] < 0,  # Histogram is Red,
+                    (macd.iat[-1] < macd_signal.iat[-1]) and (macd.iat[-2] > macd_signal.iat[-2]),  # MACD Crossbelow
+                    macd_hist.iat[-1] < 0,  # Histogram is Red,
                     macd.iat[-1] > 0,  # MACD is above zero line
                 ]):
                     return 'Sell'
         else:
             # Checking for LONG ENTRY
-            if currentPrice > ema.iat[-1]:
+            if current_price > ema:
                 print("Checking in uptrend")
                 if all([
-                    (macd.iat[-1] > macdSignal.iat[-1]) and (macd.iat[-2] < macdSignal.iat[-2]),  # MACD Crossabove
-                    macdHist.iat[-1] > 0,  # Histogram is Green,
+                    (macd.iat[-1] > macd_signal.iat[-1]) and (macd.iat[-2] < macd_signal.iat[-2]),  # MACD Crossabove
+                    macd_hist.iat[-1] > 0,  # Histogram is Green,
                     macd.iat[-1] < 0,  # MACD is below zero line
                 ]):
                     return 'Buy'
 
             # Checking for LONG ENTRY
-            elif currentPrice < ema.iat[-1]:
+            elif current_price < ema:
                 print("Checking in downtrend")
                 if all([
-                    (macd.iat[-1] < macdSignal.iat[-1]) and (macd.iat[-2] > macdSignal.iat[-2]),  # MACD Crossbelow
-                    macdHist.iat[-1] < 0,  # Histogram is Red,
+                    (macd.iat[-1] < macd_signal.iat[-1]) and (macd.iat[-2] > macd_signal.iat[-2]),  # MACD Crossbelow
+                    macd_hist.iat[-1] < 0,  # Histogram is Red,
                     macd.iat[-1] > 0,  # MACD is above zero line
                 ]):
                     return 'Sell'
-
         return ''
 
     def exit_conditions(self, df, position: dict = None):
         print("Checking for Exit Condition")
-        print(position['side'])
         if position['side'] == 'Buy':
-            if df.low.iat[-1] <= position['stoploss']:
-                return True, 'stoploss', True
-            elif df.high.iat[-1] >= position['targetprofit']:
-                return True, 'targetprofit', True
+            if df.low.iat[-1] <= position['stop_loss']:
+                return True, 'stop_loss', True
+            elif df.high.iat[-1] >= position['take_profit']:
+                return True, 'take_profit', True
         elif position['side'] == 'Sell':
-            if df.high.iat[-1] >= position['stoploss']:
-                return True, 'stoploss', False
-            elif df.low.iat[-1] <= position['targetprofit']:
-                return True, 'targetprofit', False
-        return False, ''
+            if df.high.iat[-1] >= position['stop_loss']:
+                return True, 'stop_loss', False
+            elif df.low.iat[-1] <= position['take_profit']:
+                return True, 'take_profit', False
+        return False, '', False
 
     def run(self):
         print("bot started")
         get_percentage = lambda ref, point, side: round((point - ref) * (1 if side == 'buy' else -1) / ref * 100, 3)
 
+        for watch in self.CONFIG["watchlist"]:
+            print(watch)
+            self.API.set_leverage(symbol=watch['symbol'], buy_leverage=self.CONFIG['leverage'],
+                                  sell_leverage=self.CONFIG['leverage'])
+        print("Leverage Set")
         while True:
             try:
                 if self._tick_on_timeframe(timeframe=self.CONFIG["timeframe"]):
@@ -112,77 +118,109 @@ class Bot(Thread):
                             df = self.API.get_candle_data(symbol=symbol, timeframe=timeframe)
 
                             if symbol not in self._position:
-                                # self.API.set_leverage(symbol=symbol, buy_leverage=self.CONFIG['leverage'],sell_leverage=self.CONFIG['leverage'])
                                 print(f"Checking entry for {symbol}")
-                                entrySide = self.entry_conditions(df)
-                                print(entrySide)
-                                if entrySide:
+                                entry_side = self.entry_conditions(df, symbol=symbol, timeframe=timeframe)
+                                print(entry_side)
+                                if entry_side:
                                     print("inside Entry side")
-                                    currentClose = df.low.iat[-1]
-                                    if entrySide == "Buy":
+                                    current_close = df.low.iat[-1]
+                                    if entry_side == "Buy":
                                         stop_loss = min(df.high[-12:])
                                         print("StopLoss Buy Side:- " + str(stop_loss))
-                                        print("Current Close"+str(currentClose))
-                                        take_profit = currentClose + abs((currentClose - stop_loss) * float(
+                                        print("Current Close" + str(current_close))
+                                        take_profit = current_close + abs((current_close - stop_loss) * float(
                                             self.CONFIG['risk_reward_ratio'].split(':')[1]))
 
                                         print("TargetProfit BuySide:- " + str(take_profit))
 
-                                    if entrySide == "Sell":
+                                    if entry_side == "Sell":
                                         stop_loss = max(df.high[-12:])
                                         print("StopLoss Sell Side:- " + str(stop_loss))
-                                        print("Current Close"+str(currentClose))
-                                        take_profit = currentClose - abs((currentClose - stop_loss) * float(
+                                        print("Current Close" + str(current_close))
+                                        take_profit = current_close - abs((current_close - stop_loss) * float(
                                             self.CONFIG['risk_reward_ratio'].split(':')[1]))
 
                                         print("TargetProfit SellSide:- " + str(take_profit))
 
-                                    if get_percentage(currentClose, stop_loss, entrySide) <= 0.35:
+                                    if get_percentage(current_close, stop_loss, entry_side) <= 0.35:
                                         signal = {
                                             'symbol': symbol,
-                                            'side': entrySide,
+                                            'side': entry_side,
                                             'quantity': quantity,
                                             'stop_loss': stop_loss,
                                             'take_profit': take_profit
                                         }
                                         print("Signal:- " + str(signal))
-                                        if entrySide == "Buy":
+                                        if entry_side == "Buy":
                                             if take_profit > stop_loss:
+                                                print("\n\n\n\n")
                                                 self.API.place_order(symbol=symbol, side='Buy', quantity=quantity,
                                                                      stop_loss=stop_loss, take_profit=take_profit)
-                                                print(f'OPEN {entrySide}')
+                                                print(f'OPEN {entry_side}')
                                                 self._position[symbol] = signal.copy()
                                                 print(self._position)
-                                        if entrySide == "Sell":
+
+                                                dt = datetime.now(timezone.utc)
+                                                utc_time = dt.replace(tzinfo=timezone.utc)
+                                                print(utc_time)
+
+                                                print("\n\n\n\n")
+
+                                        if entry_side == "Sell":
                                             if take_profit < stop_loss:
+                                                print("\n\n\n\n")
                                                 self.API.place_order(symbol=symbol, side='Sell', quantity=quantity,
                                                                      stop_loss=stop_loss, take_profit=take_profit)
-                                                print(f'OPEN {entrySide}')
+                                                print(f'OPEN {entry_side}')
                                                 self._position[symbol] = signal.copy()
                                                 print(self._position)
-                                else:
-                                    print("inside else of entry")
-                                    if self._position != {}:
-                                        canExit, exitType, positionType = self.exit_conditions(df,
-                                                                                               self._position[symbol])
 
-                                        if canExit:
-                                            if positionType:
-                                                print('Exit Sell')
-                                                self.API.place_order(symbol=self._position[symbol]['symbol'],
-                                                                     side='Sell',
-                                                                     quantity=self._position[symbol]['quantity'])
-                                                print('Sell')
-                                                print(exitType)
-                                                del self._position[symbol]
-                                            else:
-                                                print('Exit Buy')
-                                                self.API.place_order(symbol=self._position[symbol]['symbol'],
-                                                                     side='Buy',
-                                                                     quantity=self._position[symbol]['quantity'])
-                                                print('Buy')
-                                                print(exitType)
-                                                del self._position[symbol]
+                                                dt = datetime.now(timezone.utc)
+                                                utc_time = dt.replace(tzinfo=timezone.utc)
+                                                print(utc_time)
+
+                                                print("\n\n\n\n")
+                            else:
+                                print("inside else of entry")
+                                if self._position != {}:
+                                    can_exit, exit_type, position_type = self.exit_conditions(df,
+                                                                                              self._position[symbol])
+                                    print("_________")
+                                    print(can_exit)
+                                    print(exit_type)
+                                    print(position_type)
+                                    if can_exit:
+                                        if position_type:
+                                            print("\n\n\n\n")
+                                            print('Exit Sell')
+                                            self.API.place_order(symbol=self._position[symbol]['symbol'], side='Sell',
+                                                                 quantity=self._position[symbol]['quantity'])
+                                            print('Sell')
+                                            print(exit_type)
+                                            print(symbol + "    Position Square Off  ")
+                                            del self._position[symbol]
+
+                                            dt = datetime.now(timezone.utc)
+                                            utc_time = dt.replace(tzinfo=timezone.utc)
+                                            print(utc_time)
+
+                                            print("\n\n\n\n")
+                                        else:
+                                            print("\n\n\n\n")
+                                            print('Exit Buy')
+                                            self.API.place_order(symbol=self._position[symbol]['symbol'],
+                                                                 side='Buy',
+                                                                 quantity=self._position[symbol]['quantity'])
+                                            print('Buy')
+                                            print(exit_type)
+                                            print(symbol + "    Position Square Off  ")
+                                            del self._position[symbol]
+
+                                            dt = datetime.now(timezone.utc)
+                                            utc_time = dt.replace(tzinfo=timezone.utc)
+                                            print(utc_time)
+
+                                            print("\n\n\n\n")
                             print("Position:- " + str(self._position))
                         except Exception as e:
                             _ = f"inner loop {e}"

@@ -19,8 +19,11 @@ class Bot(Thread):
         Thread.__init__(self, daemon=False)
         self.CREDENTIALS = credentials
         self.CONFIG = config
-        self.API = ByBitAPI(credentials)
-        self.API.connect()
+        self.API = []
+        for credential in self.CREDENTIALS:
+            self.API.append(ByBitAPI(credential))
+        for api in self.API:
+            api.connect()
 
     # Helper methods
     @staticmethod
@@ -32,7 +35,7 @@ class Bot(Thread):
     def entry_conditions(self, df: pd.DataFrame, symbol: str, timeframe: str):
         current_price = df.close.iat[-1]
 
-        ema = self.API.get_ema_long_time(symbol=symbol, timeframe=timeframe, ema_period=self.CONFIG['ema_period'])
+        ema = self.API[0].get_ema_long_time(symbol=symbol, timeframe=timeframe, ema_period=self.CONFIG['ema_period'])
         macd, macd_signal, macd_hist = ta.func.MACD(
             df.close,
             fastperiod=self.CONFIG['macd_fast_period'],
@@ -103,8 +106,9 @@ class Bot(Thread):
 
         for watch in self.CONFIG["watchlist"]:
             print(watch)
-            self.API.set_leverage(symbol=watch['symbol'], buy_leverage=self.CONFIG['leverage'],
-                                  sell_leverage=self.CONFIG['leverage'])
+            for api in self.API:
+                api.set_leverage(symbol=watch['symbol'], buy_leverage=self.CONFIG['leverage'],
+                                 sell_leverage=self.CONFIG['leverage'])
         print("Leverage Set")
         while True:
             try:
@@ -115,7 +119,7 @@ class Bot(Thread):
                             symbol = watch['symbol']
                             timeframe = self.CONFIG['timeframe']
                             quantity = watch['quantity']
-                            df = self.API.get_candle_data(symbol=symbol, timeframe=timeframe)
+                            df = self.API[0].get_candle_data(symbol=symbol, timeframe=timeframe)
 
                             if symbol not in self._position:
                                 print(f"Checking entry for {symbol}")
@@ -154,8 +158,9 @@ class Bot(Thread):
                                         if entry_side == "Buy":
                                             if take_profit > stop_loss:
                                                 print("\n\n\n\n")
-                                                self.API.place_order(symbol=symbol, side='Buy', quantity=quantity,
-                                                                     stop_loss=stop_loss, take_profit=take_profit)
+                                                for api in self.API:
+                                                    api.place_order(symbol=symbol, side='Buy', quantity=quantity,
+                                                                    stop_loss=stop_loss, take_profit=take_profit)
                                                 print(f'OPEN {entry_side}')
                                                 self._position[symbol] = signal.copy()
                                                 print(self._position)
@@ -169,8 +174,9 @@ class Bot(Thread):
                                         if entry_side == "Sell":
                                             if take_profit < stop_loss:
                                                 print("\n\n\n\n")
-                                                self.API.place_order(symbol=symbol, side='Sell', quantity=quantity,
-                                                                     stop_loss=stop_loss, take_profit=take_profit)
+                                                for api in self.API:
+                                                    api.place_order(symbol=symbol, side='Sell', quantity=quantity,
+                                                                    stop_loss=stop_loss, take_profit=take_profit)
                                                 print(f'OPEN {entry_side}')
                                                 self._position[symbol] = signal.copy()
                                                 print(self._position)
@@ -193,8 +199,9 @@ class Bot(Thread):
                                         if position_type:
                                             print("\n\n\n\n")
                                             print('Exit Sell')
-                                            self.API.place_order(symbol=self._position[symbol]['symbol'], side='Sell',
-                                                                 quantity=self._position[symbol]['quantity'])
+                                            for api in self.API:
+                                                api.place_order(symbol=self._position[symbol]['symbol'], side='Sell',
+                                                                quantity=self._position[symbol]['quantity'])
                                             print('Sell')
                                             print(exit_type)
                                             print(symbol + "    Position Square Off  ")
@@ -208,9 +215,10 @@ class Bot(Thread):
                                         else:
                                             print("\n\n\n\n")
                                             print('Exit Buy')
-                                            self.API.place_order(symbol=self._position[symbol]['symbol'],
-                                                                 side='Buy',
-                                                                 quantity=self._position[symbol]['quantity'])
+                                            for api in self.API:
+                                                api.place_order(symbol=self._position[symbol]['symbol'],
+                                                                side='Buy',
+                                                                quantity=self._position[symbol]['quantity'])
                                             print('Buy')
                                             print(exit_type)
                                             print(symbol + "    Position Square Off  ")

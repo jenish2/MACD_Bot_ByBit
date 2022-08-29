@@ -1,6 +1,7 @@
 # Author : Jenish Dholariya
-
+import json
 from datetime import datetime, timedelta
+
 import pandas as pd
 import pytz
 from pybit.usdt_perpetual import HTTP
@@ -58,9 +59,11 @@ class ByBitAPI:
     def get_account_balance(self) -> float:
         """
         Gets realtime free account balance of asset\n
+        GET the Only USDT wallet Balance
         """
         balance = self.client.get_wallet_balance()
-        print(balance)
+        print(balance["result"]["USDT"]["wallet_balance"])
+        return balance["result"]["USDT"]["wallet_balance"]
 
     def set_leverage(self, symbol, buy_leverage, sell_leverage):
         leverage = self.client.set_leverage(symbol=symbol, buy_leverage=buy_leverage, sell_leverage=sell_leverage)
@@ -78,10 +81,10 @@ class ByBitAPI:
         close_position = self.client.close_position(symbol=symbol)
         print(close_position)
 
-    def get_ema_long_time(self, symbol: str, timeframe: str,ema_period : int):
-        xy=datetime.now(pytz.timezone(self.TIMEZONE))
+    def get_ema_long_time(self, symbol: str, timeframe: str, ema_period: int):
+        xy = datetime.now(pytz.timezone(self.TIMEZONE))
         fromTS = int(
-            (xy - timedelta(minutes=int(timeframe[:-1]) * 201)*2).timestamp())
+            (xy - timedelta(minutes=int(timeframe[:-1]) * 201) * 2).timestamp())
         params = {
             "symbol": symbol,
             "interval": timeframe[:-1],
@@ -100,7 +103,7 @@ class ByBitAPI:
         data = self.client.query_kline(**params)['result']
         tf = pd.DataFrame(data)
 
-        df = pd.concat([df,tf])
+        df = pd.concat([df, tf])
 
         df.set_index('open_time', inplace=True)
         df.index.name = 'datetime'
@@ -108,3 +111,26 @@ class ByBitAPI:
         df = df[['open', 'high', 'low', 'close', 'volume']]
 
         return df.close.ewm(span=ema_period, adjust=False).mean().iat[-1]
+
+
+# if __name__ == "__main__":
+#     creds = {
+#         "api_key": "JZoVLryNMUoHUeSeXY",
+#         "api_secret": "LZKH6VpG5YMmYBr44nNynmFHQQiBDI1uzWx3",
+#         "testnet": False
+#     }
+#
+#     api = ByBitAPI(credentials=creds)
+#     api.connect()
+
+# Get wallet balance
+# api.get_account_balance()
+
+# quantity = balance / current_price
+
+
+# Place order
+# symbol = "BTCUSDT"
+# side = "Buy"
+# quantity = 0.001
+# api.place_order(symbol=symbol, side=side, quantity=quantity, stop_loss=22819.0, take_profit=23876.5)

@@ -107,8 +107,13 @@ class Bot(Thread):
         for watch in self.CONFIG["watchlist"]:
             print(watch)
             for api in self.API:
-                api.set_leverage(symbol=watch['symbol'], buy_leverage=self.CONFIG['leverage'],
-                                 sell_leverage=self.CONFIG['leverage'])
+                try:
+                    api.set_leverage(symbol=watch['symbol'], buy_leverage=self.CONFIG['leverage'],
+                                     sell_leverage=self.CONFIG['leverage'])
+                except Exception as e:
+                    print("Leverage is Previous")
+                    print(e)
+
         print("Leverage Set")
         while True:
             try:
@@ -118,9 +123,8 @@ class Bot(Thread):
                         try:
                             symbol = watch['symbol']
                             timeframe = self.CONFIG['timeframe']
-                            quantity = watch['quantity']
                             df = self.API[0].get_candle_data(symbol=symbol, timeframe=timeframe)
-
+                            print(df)
                             if symbol not in self._position:
                                 print(f"Checking entry for {symbol}")
                                 entry_side = self.entry_conditions(df, symbol=symbol, timeframe=timeframe)
@@ -147,6 +151,7 @@ class Bot(Thread):
                                         print("TargetProfit SellSide:- " + str(take_profit))
 
                                     if get_percentage(current_close, stop_loss, entry_side) <= 0.35:
+                                        quantity = (self.API[0].get_account_balance() / current_close)
                                         signal = {
                                             'symbol': symbol,
                                             'side': entry_side,

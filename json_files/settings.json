@@ -1,5 +1,5 @@
 {
-	"timeframe":"13m",
+	"timeframe":"15m",
 	"sl_threshold":1.5,
 	"sl_previous_bars":12,
 	"ema_period":200,
@@ -9,10 +9,9 @@
 	"macd_slow_period":26,
 	"macd_signal_period":9,
 	"risk_reward_ratio": "1:1.5",
-	"base_capital":1000,
-	"leverage":24,
+	"leverage": 13,
 	"watchlist":
 	[
-		{"symbol":"BTCUSDT","quantity":0.01}
+		{"symbol":"BTCUSDT"}
 	]
 }

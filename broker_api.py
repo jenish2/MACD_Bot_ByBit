@@ -1,5 +1,4 @@
 # Author : Jenish Dholariya
-import json
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -41,7 +40,8 @@ class ByBitAPI:
         # print(df)
         return df
 
-    def place_order(self, symbol: str, side: str, quantity: float, stop_loss: float = None, take_profit: float = None,
+    def place_order(self, symbol: str, side: str, quantity: float, stop_loss: float = None,
+                    take_profit: float = None,
                     order_type: str = "Market"):
         order = self.client.place_active_order(
             symbol=symbol,
@@ -52,9 +52,13 @@ class ByBitAPI:
             reduce_only=False,
             close_on_trigger=False,
             stop_loss=stop_loss,
-            take_profit=take_profit
+            take_profit=take_profit,
         )
         print(order)
+        if str(order).find("ErrCode") != -1:
+            return False
+        else:
+            return True
 
     def get_account_balance(self) -> float:
         """
@@ -62,11 +66,12 @@ class ByBitAPI:
         GET the Only USDT wallet Balance
         """
         balance = self.client.get_wallet_balance()
-        print(balance["result"]["USDT"]["wallet_balance"])
-        return balance["result"]["USDT"]["wallet_balance"]
+        print(balance["result"]["USDT"]["available_balance"])
+        return balance["result"]["USDT"]["available_balance"]
 
-    def set_leverage(self, symbol, buy_leverage, sell_leverage):
-        leverage = self.client.set_leverage(symbol=symbol, buy_leverage=buy_leverage, sell_leverage=sell_leverage)
+    def set_leverage(self, symbol, buy_leverage, sell_leverage, leverage_only):
+        leverage = self.client.set_leverage(symbol=symbol, buy_leverage=buy_leverage, sell_leverage=sell_leverage,
+                                            leverage_only=leverage_only)
         print(leverage)
 
     def get_active_order(self, symbol):
@@ -122,15 +127,15 @@ class ByBitAPI:
 #
 #     api = ByBitAPI(credentials=creds)
 #     api.connect()
-
-# Get wallet balance
-# api.get_account_balance()
-
-# quantity = balance / current_price
-
-
-# Place order
-# symbol = "BTCUSDT"
-# side = "Buy"
-# quantity = 0.001
-# api.place_order(symbol=symbol, side=side, quantity=quantity, stop_loss=22819.0, take_profit=23876.5)
+#     #
+#     # # Get wallet balance
+#     api.get_account_balance()
+#     #
+#     # # # # Place order
+#     symbol = "BTCUSDT"
+#     side = "Buy"
+#     quantity = 0.01
+#     # api.set_leverage(symbol=symbol, buy_leverage=15, sell_leverage=15, leverage_only=True)
+#     # api.place_order(symbol=symbol, side=side, quantity=quantity, take_profit=21540, stop_loss=21545)
+#     # api.my_position(symbol=symbol)
+#     # api.close_position(symbol=symbol)

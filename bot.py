@@ -32,6 +32,19 @@ class Bot(Thread):
         if timeframe[-1] == 'm':
             return (cT.second == 0) and (cT.minute % int(timeframe[:-1])) == 0
 
+    @staticmethod
+    def nearest_number(number) -> float:
+        string_number = str(number)
+        i = 0
+
+        for element_index in range(string_number.find(".") + 1, len(string_number)):
+            if string_number[element_index] != "0":
+                i = element_index
+                break
+
+        string_number = string_number[:i + 1]
+        return float(string_number)
+
     def entry_conditions(self, df: pd.DataFrame, symbol: str, timeframe: str):
         current_price = df.close.iat[-1]
 
@@ -109,7 +122,7 @@ class Bot(Thread):
             for api in self.API:
                 try:
                     api.set_leverage(symbol=watch['symbol'], buy_leverage=self.CONFIG['leverage'],
-                                     sell_leverage=self.CONFIG['leverage'])
+                                     sell_leverage=self.CONFIG['leverage'], leverage_only=True)
                 except Exception as e:
                     print("Leverage is Previous")
                     print(e)
@@ -124,14 +137,13 @@ class Bot(Thread):
                             symbol = watch['symbol']
                             timeframe = self.CONFIG['timeframe']
                             df = self.API[0].get_candle_data(symbol=symbol, timeframe=timeframe)
-                            print(df)
                             if symbol not in self._position:
                                 print(f"Checking entry for {symbol}")
                                 entry_side = self.entry_conditions(df, symbol=symbol, timeframe=timeframe)
                                 print(entry_side)
                                 if entry_side:
                                     print("inside Entry side")
-                                    current_close = df.low.iat[-1]
+                                    current_close = df.close.iat[-1]
                                     if entry_side == "Buy":
                                         stop_loss = min(df.high[-12:])
                                         print("StopLoss Buy Side:- " + str(stop_loss))
@@ -151,7 +163,14 @@ class Bot(Thread):
                                         print("TargetProfit SellSide:- " + str(take_profit))
 
                                     if get_percentage(current_close, stop_loss, entry_side) <= 0.35:
-                                        quantity = (self.API[0].get_account_balance() / current_close)
+                                        quantity = (self.API[0].get_account_balance() * self.CONFIG[
+                                            'leverage'] / current_close)
+                                        if round(quantity) > 0:
+                                            quantity = round(quantity)
+                                        else:
+                                            quantity_1 = round(quantity, 4)
+                                            quantity = Bot.nearest_number(quantity_1)
+
                                         signal = {
                                             'symbol': symbol,
                                             'side': entry_side,
@@ -163,34 +182,49 @@ class Bot(Thread):
                                         if entry_side == "Buy":
                                             if take_profit > stop_loss:
                                                 print("\n\n\n\n")
+                                                order_status = []
                                                 for api in self.API:
-                                                    api.place_order(symbol=symbol, side='Buy', quantity=quantity,
-                                                                    stop_loss=stop_loss, take_profit=take_profit)
-                                                print(f'OPEN {entry_side}')
-                                                self._position[symbol] = signal.copy()
-                                                print(self._position)
+                                                    try:
+                                                        order_status.append(api.place_order(symbol=symbol, side='Buy',
+                                                                                            quantity=quantity,
+                                                                                            stop_loss=stop_loss,
+                                                                                            take_profit=take_profit))
+                                                    except Exception as e:
+                                                        print(e)
+                                                if order_status.count(True) > 0:
+                                                    print(f'OPEN {entry_side}')
+                                                    self._position[symbol] = signal.copy()
+                                                    print(self._position)
 
-                                                dt = datetime.now(timezone.utc)
-                                                utc_time = dt.replace(tzinfo=timezone.utc)
-                                                print(utc_time)
+                                                    dt = datetime.now(timezone.utc)
+                                                    utc_time = dt.replace(tzinfo=timezone.utc)
+                                                    print(utc_time)
 
-                                                print("\n\n\n\n")
+                                                    print("\n\n\n\n")
 
                                         if entry_side == "Sell":
                                             if take_profit < stop_loss:
                                                 print("\n\n\n\n")
+                                                order_status = []
                                                 for api in self.API:
-                                                    api.place_order(symbol=symbol, side='Sell', quantity=quantity,
-                                                                    stop_loss=stop_loss, take_profit=take_profit)
-                                                print(f'OPEN {entry_side}')
-                                                self._position[symbol] = signal.copy()
-                                                print(self._position)
+                                                    try:
+                                                        order_status.append(api.place_order(symbol=symbol, side='Sell',
+                                                                                            quantity=quantity,
+                                                                                            stop_loss=stop_loss,
+                                                                                            take_profit=take_profit))
+                                                    except Exception as e:
+                                                        print(e)
 
-                                                dt = datetime.now(timezone.utc)
-                                                utc_time = dt.replace(tzinfo=timezone.utc)
-                                                print(utc_time)
+                                                if order_status.count(True) > 0:
+                                                    print(f'OPEN {entry_side}')
+                                                    self._position[symbol] = signal.copy()
+                                                    print(self._position)
 
-                                                print("\n\n\n\n")
+                                                    dt = datetime.now(timezone.utc)
+                                                    utc_time = dt.replace(tzinfo=timezone.utc)
+                                                    print(utc_time)
+
+                                                    print("\n\n\n\n")
                             else:
                                 print("inside else of entry")
                                 if self._position != {}:
@@ -204,9 +238,13 @@ class Bot(Thread):
                                         if position_type:
                                             print("\n\n\n\n")
                                             print('Exit Sell')
+
                                             for api in self.API:
-                                                api.place_order(symbol=self._position[symbol]['symbol'], side='Sell',
-                                                                quantity=self._position[symbol]['quantity'])
+                                                try:
+                                                    api.close_position(symbol=symbol)
+                                                except Exception as e:
+                                                    print(e)
+
                                             print('Sell')
                                             print(exit_type)
                                             print(symbol + "    Position Square Off  ")
@@ -220,10 +258,13 @@ class Bot(Thread):
                                         else:
                                             print("\n\n\n\n")
                                             print('Exit Buy')
+
                                             for api in self.API:
-                                                api.place_order(symbol=self._position[symbol]['symbol'],
-                                                                side='Buy',
-                                                                quantity=self._position[symbol]['quantity'])
+                                                try:
+                                                    api.close_position(symbol=symbol)
+                                                except Exception as e:
+                                                    print(e)
+
                                             print('Buy')
                                             print(exit_type)
                                             print(symbol + "    Position Square Off  ")

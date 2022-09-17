@@ -59,7 +59,7 @@ class Bot(Thread):
         if self.CONFIG['use_2nd_ema']:
             ema2 = ta.func.EMA(df.close, self.CONFIG['ema_period_2'])
             # Checking for LONG ENTRY
-            if current_price > ema2.iat[-1] and current_price > ema:
+            if ema < ema2.iat[-1] < current_price:
                 print("Checking in uptrend + using 2 ema")
                 if all([
                     (macd.iat[-1] > macd_signal.iat[-1]) and (macd.iat[-2] < macd_signal.iat[-2]),  # MACD Crossabove
@@ -69,7 +69,7 @@ class Bot(Thread):
                     return 'Buy'
 
             # Checking for LONG ENTRY
-            elif current_price < ema2.iat[-1] and current_price < ema:
+            elif ema > ema2.iat[-1] > current_price:
                 print("Checking in downtrend + using 2 ema")
                 if all([
                     (macd.iat[-1] < macd_signal.iat[-1]) and (macd.iat[-2] > macd_signal.iat[-2]),  # MACD Crossbelow

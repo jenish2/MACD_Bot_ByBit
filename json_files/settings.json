@@ -1,5 +1,5 @@
 {
-	"timeframe":"15m",
+	"timeframe":"1m",
 	"sl_threshold":1.5,
 	"sl_previous_bars":12,
 	"ema_period":200,

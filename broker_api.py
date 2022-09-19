@@ -40,6 +40,25 @@ class ByBitAPI:
         # print(df)
         return df
 
+    def get_current_price(self, symbol: str, timeframe: str) -> float:
+        fromTS = int(
+            (datetime.now(pytz.timezone(self.TIMEZONE)) - timedelta(minutes=int(timeframe[:-1]) * 1)).timestamp())
+        params = {
+            "symbol": symbol,
+            "interval": timeframe[:-1],
+            "from": fromTS
+        }
+        data = self.client.query_kline(**params)['result']
+        print(data)
+        df = pd.DataFrame(data)
+        df.set_index('open_time', inplace=True)
+        df.index.name = 'datetime'
+        df.index = [datetime.fromtimestamp(x, tz=pytz.timezone(self.TIMEZONE)) for x in df.index]
+        df = df[['open', 'high', 'low', 'close', 'volume']]
+        print("data fetched by api")
+        return df.close[-1]
+
+
     def place_order(self, symbol: str, side: str, quantity: float, stop_loss: float = None,
                     take_profit: float = None,
                     order_type: str = "Market"):

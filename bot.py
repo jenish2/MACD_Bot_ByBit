@@ -145,7 +145,7 @@ class Bot(Thread):
                                     print("inside Entry side")
                                     current_close = df.close.iat[-1]
                                     if entry_side == "Buy":
-                                        stop_loss = min(df.high[-12:])
+                                        stop_loss = min(df.low[-12:])
                                         print("StopLoss Buy Side:- " + str(stop_loss))
                                         print("Current Close" + str(current_close))
                                         take_profit = current_close + abs((current_close - stop_loss) * float(
@@ -162,14 +162,24 @@ class Bot(Thread):
 
                                         print("TargetProfit SellSide:- " + str(take_profit))
 
-                                    if get_percentage(current_close, stop_loss, entry_side) <= 0.35:
-                                        quantity = (self.API[0].get_account_balance() * self.CONFIG[
-                                            'leverage'] / current_close)
-                                        if round(quantity) > 0:
-                                            quantity = round(quantity)
+                                    if get_percentage(current_close, stop_loss, entry_side) <= 1.5:
+                                        quantity_1 = ((self.API[0].get_account_balance() * self.CONFIG[
+                                            'leverage']) / self.API[0].get_current_price(symbol=symbol,
+                                                                                         timeframe=timeframe))
+                                        qtc_string = str(quantity_1)
+                                        dot_position = qtc_string.find(".")
+                                        if dot_position != -1:
+                                            if (len(qtc_string) - (dot_position + 1)) > 4:
+                                                quantity = float(qtc_string[:dot_position + 5])
+                                            else:
+                                                quantity = round(quantity_1, 4)
                                         else:
-                                            quantity_1 = round(quantity, 4)
-                                            quantity = Bot.nearest_number(quantity_1)
+                                            quantity = round(quantity_1, 4)
+                                        # if round(quantity) > 0:
+                                        #     quantity = round(quantity)
+                                        # else:
+                                        #     quantity_1 = round(quantity, 4)
+                                        #     quantity = Bot.nearest_number(quantity_1)
 
                                         signal = {
                                             'symbol': symbol,
